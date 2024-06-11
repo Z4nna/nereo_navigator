@@ -7,3 +7,6 @@ Middlewares
 Drivers
 micro_ros_stm32cubemx_utils
 !micro_ros_stm32cubemx_utils/microros_static_library/library_generation/extra_packages
+!build/nereo_navigator.elf
+!build/nereo_navigator.hex
+!build/nereo_navigator.bin
