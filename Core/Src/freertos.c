@@ -35,6 +35,7 @@
 #include <rmw_microxrcedds_c/config.h>
 #include <rmw_microros/rmw_microros.h>
 #include "rcutils/time.h"
+#include "rclc_parameter/rclc_parameter.h"
 
 // messages includes
 #include <diagnostic_msgs/msg/Diagnostic_Array.h>
@@ -62,6 +63,7 @@ typedef enum {
 	ROS2_ERROR,
 	ROS2_STALE
 } RosErrors;
+
 typedef enum {
 	NAVIGATION_MODE_MANUAL,
     NAVIGATION_MODE_STABILIZE_FULL,
@@ -207,7 +209,7 @@ void StartDefaultTask(void *argument)
         printf("Error on default allocators (line %d)\n", __LINE__);
     }
 
-    // micro-ROS app
+    // uROS app
 
     // time
 	rcutils_time_point_value_t now;
@@ -226,7 +228,7 @@ void StartDefaultTask(void *argument)
 	diagnostic_msgs__msg__DiagnosticArray diagnostic_values_array;
 	diagnostic_values_array.header.frame_id.data = "navigator";
 
-	std_msgs__msg__UInt16MultiArray thruster_status;
+	nereo_interfaces__msg__ThrusterStatuses thruster_status;
 	sensor_msgs__msg__Joy joystick_input;
 	sensor_msgs__msg__Imu imu_data;
 	sensor_msgs__msg__FluidPressure fluid_pressure;
@@ -248,6 +250,9 @@ void StartDefaultTask(void *argument)
     // create executor
 	rclc_executor_t executor;
 	executor = rclc_executor_get_zero_initialized_executor();
+	rclc_executor_init(
+	    &executor, &support.context,
+		RCLC_EXECUTOR_PARAMETER_SERVER_HANDLES, &allocator);
 
 	/*
 	 * PUBLISHERS
@@ -256,7 +261,7 @@ void StartDefaultTask(void *argument)
 	rclc_publisher_init_default(
 		&thruster_status_publisher,
 		&node,
-		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt16MultiArray),
+		ROSIDL_GET_MSG_TYPE_SUPPORT(nereo_interfaces, msg, ThrusterStatuses),
 		"thruster_status"
 	);
 
@@ -390,9 +395,30 @@ void StartDefaultTask(void *argument)
 	if (rc != RCL_RET_OK) {
 	  // TODO Handle error
 	}
+
+	// controller parameter server: it takes parameter for the maximum number of PIDs possible (ie 4)
+	// only uses the needed parameters for the current navigation mode.
+	rclc_parameter_server_t controller_constants_parameter_server;
+
+	const rclc_parameter_options_t contr_const_param_server_opt = {
+			.notify_changed_over_dds = false,
+			.max_params = 12,
+			.allow_undeclared_parameters = true,
+			.low_mem_mode = false
+	};
+
+	rc = rclc_parameter_server_init_with_option(&controller_constants_parameter_server, &node, &contr_const_param_server_opt);
+
+	if (RCL_RET_OK != rc)
+	{
+		// TODO Handle error
+	}
+
+	rc = rclc_executor_add_parameter_server(&executor, &controller_constants_parameter_server, NULL);
+
+
 	// Spin executor to receive requests
 	rclc_executor_spin(&executor);
-
 
 	start_pwm_channels_1_to_4(&htim2);
 	start_pwm_channels_1_to_4(&htim3);
@@ -401,7 +427,7 @@ void StartDefaultTask(void *argument)
     float joy_input[6] = {
     		joystick_input.axes.data[0], // sway
 			joystick_input.axes.data[1], // forward
-			joystick_input.axes.data[3], // depth
+			joystick_input.axes.data[3], // heave
 			0,							 // pitch
 			0,							 // roll
 			joystick_input.axes.data[2]  // yaw
@@ -422,6 +448,11 @@ void StartDefaultTask(void *argument)
     {
     	if (is_rov_armed == ROV_ARMED)
     	{
+    		joy_input[0] = joystick_input.axes.data[0]; // sway
+    		joy_input[1] =joystick_input.axes.data[1]; // forward
+    		joy_input[2] =joystick_input.axes.data[3]; // heave
+			joy_input[6] =joystick_input.axes.data[2]; // yaw
+
 			uint16_t pwm_output[8] = {1500};
 			switch (navigation_mode)
 			{
@@ -429,9 +460,11 @@ void StartDefaultTask(void *argument)
 				calculate_pwm(joy_input, pwm_output);
 				break;
 			case NAVIGATION_MODE_STABILIZE_FULL:
+				// TODO get current values
 				calculate_pwm_with_pid(joy_input, pwm_output, setpoints, current_values, integration_intervals, &orientation_quaternion);
 				// TODO: implement stabilization
 			default:
+				set_pwm_idle();
 				break;
 			}
 			// send pwms
@@ -500,6 +533,7 @@ void arm_disarm_service_callback(const void * request_msg, void * response_msg)
   }
 
 }
+
 void set_nav_mode_service_callback(const void * request_msg, void * response_msg)
 {
 	nereo_interfaces__srv__SetNavigationMode_Request * req_in = (nereo_interfaces__srv__SetNavigationMode_Request *) request_msg;
@@ -508,11 +542,21 @@ void set_nav_mode_service_callback(const void * request_msg, void * response_msg
 	{
 		case NAVIGATION_MODE_MANUAL:
 			navigation_mode = NAVIGATION_MODE_MANUAL;
+			res_in->success = true;
+			res_in->mode_after_set = NAVIGATION_MODE_MANUAL;
+			res_in->message.data = "Navigation mode set to manual.";
 			break;
 		case NAVIGATION_MODE_STABILIZE_FULL:
+			res_in->success = true;
+			res_in->mode_after_set = NAVIGATION_MODE_STABILIZE_FULL;
+			res_in->message.data = "Navigation mode set to stabilize: full.";
 			navigation_mode = NAVIGATION_MODE_STABILIZE_FULL;
 			break;
 		default:
+			res_in->success = false;
+			res_in->mode_after_set = NAVIGATION_MODE_MANUAL;
+			res_in->message.data = "Wrong request: navigation mode does not exist. Reverted back to manual mode.";
+			navigation_mode = NAVIGATION_MODE_MANUAL;
 			break;
 	}
 }
