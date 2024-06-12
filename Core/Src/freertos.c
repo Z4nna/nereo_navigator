@@ -461,6 +461,11 @@ void StartDefaultTask(void *argument)
 				break;
 			case NAVIGATION_MODE_STABILIZE_FULL:
 				// TODO get current values
+				orientation_quaternion.w = imu_data.orientation.w;
+				orientation_quaternion.a = imu_data.orientation.x;
+				orientation_quaternion.b = imu_data.orientation.y;
+				orientation_quaternion.c = imu_data.orientation.z;
+
 				calculate_pwm_with_pid(joy_input, pwm_output, setpoints, current_values, integration_intervals, &orientation_quaternion);
 				// TODO: implement stabilization
 			default:
