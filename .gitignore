@@ -5,7 +5,8 @@
 build/*
 Middlewares
 Drivers
-micro_ros_stm32cubemx_utils
+micro_ros_stm32cubemx_utils/*
 !build/nereo_navigator.elf
 !build/nereo_navigator.hex
 !build/nereo_navigator.bin
+.DS_Store
