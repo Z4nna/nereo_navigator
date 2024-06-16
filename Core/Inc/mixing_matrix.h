@@ -16,7 +16,6 @@
  *
  * @param FIXED_MIXING_MATRIX The 8x6 fixed mixing matrix.
  * @param calculate_rotation_matrix_6d Calculates a 6x6 rotation matrix from a 4-element quaternion.
- * @param quaternion_to_rotation_matrix_3d Calculates a 3x3 rotation matrix from a 4-element quaternion.
  * @param init_fixed_mixing_matrix Initializes the FIXED_MIXING_MATRIX.
  */
 
@@ -27,7 +26,6 @@
 __attribute__((aligned(4))) extern float FIXED_MIXING_MATRIX[8][6];
 
 //void calculate_rotation_matrix_6d(float rotation_matrix[6][6], float quaternion[4]);
-
 
 void init_fixed_mixing_matrix(float mixing_matrix[8][6]);
 

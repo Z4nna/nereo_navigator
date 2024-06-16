@@ -1,30 +1,27 @@
-/*
- * pid.h
- *
- *  Created on: May 23, 2024
- *      Author: michelecarenini
- */
-
-#ifndef CORE_INC_PID_H_
-#define CORE_INC_PID_H_
 
 /**
  * @file pid.h
  * @brief Provides a PID controller implementation.
+ * @author michele carenini
+ * @date May, 2024
  *
  * This header file defines a PID (Proportional-Integral-Derivative) controller
- * structure and functions to initialize and update the PID controller.
+ * structure and functions to initialize, update, and set the constants of the
+ * PID controller.
  *
- * @param kp Proportional gain
- * @param ki Integral gain
- * @param kd Derivative gain
- * @param integral Integral term
- * @param prev_error Previous error
+ * @param kp Proportional gain constant.
+ * @param ki Integral gain constant.
+ * @param kd Derivative gain constant.
+ * @param integral Accumulated integral error.
+ * @param prev_error Previous error value.
  *
- * @function PID_Init Initializes the PID controller with the given parameters.
- * @function PID_Update Updates the PID controller with the current value and
- * returns the control output.
+ * @function PID_Init Initializes the PID controller with the given gain constants.
+ * @function PID_Update Calculates the PID controller output based on the current value, setpoint, and time delta.
+ * @function PID_set_constants Sets the PID constants.
  */
+
+#ifndef CORE_INC_PID_H_
+#define CORE_INC_PID_H_
 
 #include <stdio.h>
 

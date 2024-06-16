@@ -10,16 +10,20 @@
 const float PIGRECO = 3.14159265359;
 
 
+/**
+ * The fixed 8x6 mixing matrix: the columns are, respectively: foward, sway, heave, pitch, roll, yaw. (have to double check with the other code and my calculation)
+ * The rows are, respectively, thrusters from 0 to 7.
+ * The matrix is aligned to 4-byte boundaries in memory for faster access.
+ */
 __attribute__((aligned(4))) float FIXED_MIXING_MATRIX[8][6] = {
-	{0.7071067812, 0.7071067812, 0, 0, 0, 1},
-	{-0.7071067812, 0.7071067812, 0, 0, 0, -1},
-	{-0.7071067812, 0.7071067812, 0, 0, 0, -1},
-	{0.7071067812, 0.7071067812, 0, 0, 0, 1},
-	{0, 0, 1, 1, -1, 0},
-	{0, 0, 1, 1, 1, 0},
-	{0, 0, 1, -1, -1, 0},
-	{0, 0, 1, -1, 1, 0}
-};
+    {0.7071067812, 0.7071067812, 0, 0, 0, 1},
+    {-0.7071067812, 0.7071067812, 0, 0, 0, -1},
+    {-0.7071067812, 0.7071067812, 0, 0, 0, -1},
+    {0.7071067812, 0.7071067812, 0, 0, 0, 1},
+    {0, 0, 1, 1, -1, 0},
+    {0, 0, 1, 1, 1, 0},
+    {0, 0, 1, -1, -1, 0},
+    {0, 0, 1, -1, 1, 0}};
 
 /**
  * Calculates a 6x6 rotation matrix from a 4-element quaternion.
@@ -28,6 +32,7 @@ __attribute__((aligned(4))) float FIXED_MIXING_MATRIX[8][6] = {
  * matrix from the quaternion, and then placing that 3x3 matrix in the top-left
  * and bottom-right corners of the 6x6 matrix, with the remaining elements set
  * to 0.
+ * As of now this is not used, may use it in the future.
  *
  * @param rotation_matrix The 6x6 rotation matrix to be calculated.
  * @param quaternion The 4-element quaternion to use for the calculation.

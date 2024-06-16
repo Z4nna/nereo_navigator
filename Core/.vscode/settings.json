@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "mixing_matrix.h": "c",
+        "interpolations.h": "c"
+    }
+}

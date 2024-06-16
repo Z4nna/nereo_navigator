@@ -54,6 +54,14 @@ float PID_Update(PID *pid, float current_value, float setpoint, float dt)
     return output;
 }
 
+/**
+ * Sets the proportional, integral, and derivative gain constants for a PID controller.
+ *
+ * @param pid Pointer to the PID controller struct to update.
+ * @param kp Proportional gain.
+ * @param ki Integral gain.
+ * @param kd Derivative gain.
+ */
 void PID_set_constants(PID *pid, float kp, float ki, float kd)
 {
     pid->kp = kp;

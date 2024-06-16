@@ -8,7 +8,10 @@
 
 #include "stabilize_mode.h"
 
+// tolerance: if a joystick input (in [-1,1]) is < TOLERANCE, it is considered as 0
 const double TOLERANCE = 0.05;
+
+// PIDs controllers, respectively for z, pitch, roll, yaw
 PID pids[4] = {0};
 
 void init_pids(float kps[PID_NUMBER], float kis[PID_NUMBER], float kds[PID_NUMBER])
@@ -42,6 +45,7 @@ uint8_t calculate_pwm_with_pid(float input_values[6], uint16_t pwm_output[8], fl
 	z_out_q.c = z_out;
 	Quaternion q_inv = {0};
 	invert_quaternion(orientation_quaternion, &q_inv);
+	
 	// applies the inverse rotation to the z_out_q vector
 	Quaternion intermediate_result = {0};
 	Quaternion z_out_body_frame = {0};
