@@ -445,7 +445,7 @@ void StartDefaultTask(void *argument)
 				calculate_pwm(joy_input, pwm_output);
 				break;
 			case NAVIGATION_MODE_STABILIZE_FULL:
-				calculate_pwm_with_pid(joy_input, pwm_output, &imu_data.orientation, &fluid_pressure, integration_intervals);
+				calculate_pwm_with_pid(joy_input, pwm_output, &imu_data.orientation, &fluid_pressure.fluid_pressure, integration_intervals);
 			default:
 				set_pwm_idle();
 				break;
