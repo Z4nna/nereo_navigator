@@ -5,10 +5,11 @@
 build/*
 Middlewares
 Drivers
+.DS_Store
+Core/.DS_Store
+Core/.vscode
 micro_ros_stm32cubemx_utils/*
 !build/nereo_navigator.elf
 !build/nereo_navigator.hex
 !build/nereo_navigator.bin
-.DS_Store
-Core/.DS_Store
-.DS_Store
+
