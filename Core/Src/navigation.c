@@ -26,9 +26,15 @@ enum {
  * @return OK if the calculation was successful, MAT_MULT_ERROR if the matrix
  * multiplication failed.
  */
-uint8_t calculate_pwm(float joystick_input[6], uint16_t pwm_output[8])
+uint8_t calculate_pwm(const float in_joystick_input[6], uint16_t pwm_output[8])
 {
-    normalize_vector(joystick_input, joystick_input, 6);
+	float joystick_input[6];
+	for(uint8_t i = 0; i < 6; i++)
+	{
+		joystick_input[i] = in_joystick_input[i];
+	}
+
+    normalize_vector(in_joystick_input, joystick_input, 6);
 
     float f_pwm_output[8];
 
@@ -62,12 +68,12 @@ uint8_t calculate_pwm(float joystick_input[6], uint16_t pwm_output[8])
     return OK;
 }
 
-void invert_quaternion(Quaternion * q, Quaternion * q_inv)
+void invert_quaternion(const Quaternion * q, Quaternion * q_inv)
 {
 	arm_quaternion_inverse_f32((float*)q, (float*)q_inv, 1);
 }
 
-void multiply_quaternions(Quaternion* q1, Quaternion* q2, Quaternion* qResult)
+void multiply_quaternions(const Quaternion* q1, const Quaternion* q2, Quaternion* qResult)
 {
     // Perform the quaternion multiplication
     arm_quaternion_product_single_f32((float*)q1, (float*)q2, (float*)qResult);

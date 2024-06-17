@@ -424,35 +424,20 @@ void StartDefaultTask(void *argument)
 	start_pwm_channels_1_to_4(&htim3);
 	set_pwm_idle();
 
-    float joy_input[6] = {
-    		joystick_input.axes.data[0], // sway
-			joystick_input.axes.data[1], // forward
-			joystick_input.axes.data[3], // heave
-			0,							 // pitch
-			0,							 // roll
-			joystick_input.axes.data[2]  // yaw
-    };
+    float joy_input[6] = {0};
 
-    Quaternion orientation_quaternion = {
-		imu_data.orientation.w,
-		imu_data.orientation.x,
-		imu_data.orientation.y,
-		imu_data.orientation.z
-    };
-
-    float integration_intervals[4] = {0};
-    float setpoints[4] = {0};
-    float current_values[4] = {0};
+    // need either to calculate this in the subscription callbacks, or to set it to a fixed value. In this case, 20Hz
+    float integration_intervals[4] = {0.05};
 
     for(;;)
     {
     	if (is_rov_armed == ROV_ARMED)
     	{
+    		// save joystick input
     		joy_input[0] = joystick_input.axes.data[0]; // sway
     		joy_input[1] =joystick_input.axes.data[1]; // forward
     		joy_input[2] =joystick_input.axes.data[3]; // heave
 			joy_input[6] =joystick_input.axes.data[2]; // yaw
-
 			uint16_t pwm_output[8] = {1500};
 			switch (navigation_mode)
 			{
@@ -460,14 +445,7 @@ void StartDefaultTask(void *argument)
 				calculate_pwm(joy_input, pwm_output);
 				break;
 			case NAVIGATION_MODE_STABILIZE_FULL:
-				// TODO get current values
-				orientation_quaternion.w = imu_data.orientation.w;
-				orientation_quaternion.a = imu_data.orientation.x;
-				orientation_quaternion.b = imu_data.orientation.y;
-				orientation_quaternion.c = imu_data.orientation.z;
-
-				calculate_pwm_with_pid(joy_input, pwm_output, setpoints, current_values, integration_intervals, &orientation_quaternion);
-				// TODO: implement stabilization
+				calculate_pwm_with_pid(joy_input, pwm_output, &imu_data.orientation, &fluid_pressure, integration_intervals);
 			default:
 				set_pwm_idle();
 				break;

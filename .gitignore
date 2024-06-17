@@ -10,3 +10,5 @@ micro_ros_stm32cubemx_utils/*
 !build/nereo_navigator.hex
 !build/nereo_navigator.bin
 .DS_Store
+Core/.DS_Store
+.DS_Store

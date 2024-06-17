@@ -32,9 +32,9 @@ typedef enum
 typedef struct
 {
 	float w; ///< Scalar component of the quaternion
-	float a; ///< Vector component x of the quaternion
-	float b; ///< Vector component y of the quaternion
-	float c; ///< Vector component z of the quaternion
+	float x; ///< Vector component x of the quaternion
+	float y; ///< Vector component y of the quaternion
+	float z; ///< Vector component z of the quaternion
 } Quaternion;
 
 /**
@@ -44,7 +44,7 @@ typedef struct
  * @param pwm_output
  * @return eventual error code
  */
-uint8_t calculate_pwm(float joystick_input[6], uint16_t pwm_output[8]);
+uint8_t calculate_pwm(const float joystick_input[6], uint16_t pwm_output[8]);
 
 /**
  * @brief Inverts a quaternion.
@@ -52,7 +52,7 @@ uint8_t calculate_pwm(float joystick_input[6], uint16_t pwm_output[8]);
  * @param q Pointer to the input quaternion.
  * @param q_inv Pointer to the output inverted quaternion.
  */
-void invert_quaternion(Quaternion *q, Quaternion *q_inv);
+void invert_quaternion(const Quaternion *q, Quaternion *q_inv);
 
 /**
  * @brief Multiplies two quaternions.
@@ -61,6 +61,6 @@ void invert_quaternion(Quaternion *q, Quaternion *q_inv);
  * @param q2 Pointer to the second quaternion.
  * @param qResult Pointer to the output quaternion result.
  */
-void multiply_quaternions(Quaternion *q1, Quaternion *q2, Quaternion *qResult);
+void multiply_quaternions(const Quaternion *q1, const Quaternion *q2, Quaternion *qResult);
 
 #endif /* CORE_INC_NAVIGATION_H_ */
