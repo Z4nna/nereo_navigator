@@ -92,6 +92,7 @@ typedef enum {
 /* USER CODE BEGIN Variables */
 volatile RovArmModes is_rov_armed = ROV_ARMED;
 volatile NavigationModes navigation_mode = NAVIGATION_MODE_MANUAL;
+uint8_t MAX_DIAG_MESSAGES = 10;
 //static RovArmModes is_rov_armed = ROV_DISARMED;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -131,6 +132,7 @@ void set_pwms(uint16_t pwms[8]);
 
 void arm_disarm_service_callback(const void *, void *);
 void set_nav_mode_service_callback(const void *, void *);
+uint8_t add_diagnostic_status(diagnostic_msgs__msg__DiagnosticArray * array, char * hardware_id, RosErrors level, char * name, char * message);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -207,16 +209,17 @@ void StartDefaultTask(void *argument)
 
     if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
         printf("Error on default allocators (line %d)\n", __LINE__);
+        Error_Handler();
     }
 
     // uROS app
 
     // time
 	rcutils_time_point_value_t now;
-	// micro-ROS application
 	// publishers
 	rcl_publisher_t thruster_status_publisher;
 	rcl_publisher_t diagnostic_publisher;
+
 
 	// subscribers
 	rcl_subscription_t joystick_subscriber;
@@ -224,9 +227,14 @@ void StartDefaultTask(void *argument)
 	rcl_subscription_t pressure_subscriber;
 	rcl_subscription_t temperature_subscriber;
 
+
+
 	// messages
 	diagnostic_msgs__msg__DiagnosticArray diagnostic_values_array;
-	diagnostic_values_array.header.frame_id.data = "navigator";
+	diagnostic_values_array.header.frame_id.data = "navigator_fc";
+	// need to malloc :(, not sure if I should use malloc() or microros_allocate() ... will be tested soon on the hardware
+	diagnostic_values_array.status.data =
+			(diagnostic_msgs__msg__DiagnosticStatus *)microros_allocate(sizeof(diagnostic_msgs__msg__DiagnosticStatus) * MAX_DIAG_MESSAGES, NULL);
 
 	nereo_interfaces__msg__ThrusterStatuses thruster_status;
 	sensor_msgs__msg__Joy joystick_input;
@@ -352,7 +360,9 @@ void StartDefaultTask(void *argument)
 	);
 
 	if (rc != RCL_RET_OK) {
-	  // TODO Handle error
+		add_diagnostic_status(&diagnostic_values_array, "service_init", ROS2_STALE,
+				"arm_disarm_service", "Error initializing arm_disarm_service.");
+		Error_Handler();
 	}
 
 	std_srvs__srv__SetBool_Request arm_disarm_request_msg;
@@ -364,7 +374,9 @@ void StartDefaultTask(void *argument)
 	);
 
 	if (rc != RCL_RET_OK) {
-	  // TODO Handle error
+		add_diagnostic_status(&diagnostic_values_array, "executor_add", ROS2_STALE,
+				"arm_disarm_service", "Error adding arm_disarm_service to executor.");
+		Error_Handler();
 	}
 
 	// set navigation mode service
@@ -381,7 +393,9 @@ void StartDefaultTask(void *argument)
 	);
 
 	if (rc != RCL_RET_OK) {
-	  // TODO Handle error
+		add_diagnostic_status(&diagnostic_values_array, "service_init", ROS2_STALE,
+				"set_nav_mode_service", "Error initializing set_nav_mode_service.");
+		Error_Handler();
 	}
 
 	nereo_interfaces__srv__SetNavigationMode_Request nav_mode_request_msg;
@@ -393,7 +407,9 @@ void StartDefaultTask(void *argument)
 	);
 
 	if (rc != RCL_RET_OK) {
-	  // TODO Handle error
+		add_diagnostic_status(&diagnostic_values_array, "executor_add", ROS2_STALE,
+				"set_nav_mode_service", "Error adding set_nav_mode_service to executor.");
+		Error_Handler();
 	}
 
 	// controller parameter server: it takes parameter for the maximum number of PIDs possible (ie 4)
@@ -411,11 +427,16 @@ void StartDefaultTask(void *argument)
 
 	if (RCL_RET_OK != rc)
 	{
-		// TODO Handle error
+		add_diagnostic_status(&diagnostic_values_array, "parameter_server_init", ROS2_ERROR,
+				"parameter_server", "Error initializing parameter server.");
 	}
 
 	rc = rclc_executor_add_parameter_server(&executor, &controller_constants_parameter_server, NULL);
-
+	if (RCL_RET_OK != rc)
+	{
+		add_diagnostic_status(&diagnostic_values_array, "parameter_server_exec_add", ROS2_ERROR,
+				"parameter_server", "Error adding parameter server to executor.");
+	}
 
 	// Spin executor to receive requests
 	rclc_executor_spin(&executor);
@@ -428,9 +449,20 @@ void StartDefaultTask(void *argument)
 
     // need either to calculate this in the subscription callbacks, or to set it to a fixed value. In this case, 20Hz
     float integration_intervals[4] = {0.05};
+	uint16_t pwm_output[8] = {1500};
 
-    for(;;)
+	uint8_t pwm_error = 0;
+	diagnostic_values_array.header.frame_id.data = "navigator_fc";
+
+    while(1)
     {
+    	rc = rcutils_system_time_now(&now);
+    	if(RCL_RET_OK != rc)
+		{
+			// TODO add to diagnostic, blink status LED?, write logs to flash?
+		}
+    	diagnostic_values_array.header.stamp.sec = RCUTILS_NS_TO_S(now);
+    	diagnostic_values_array.header.stamp.nanosec = now % (1000*1000*1000);
     	if (is_rov_armed == ROV_ARMED)
     	{
     		// save joystick input
@@ -438,24 +470,39 @@ void StartDefaultTask(void *argument)
     		joy_input[1] =joystick_input.axes.data[1]; // forward
     		joy_input[2] =joystick_input.axes.data[3]; // heave
 			joy_input[6] =joystick_input.axes.data[2]; // yaw
-			uint16_t pwm_output[8] = {1500};
 			switch (navigation_mode)
 			{
 			case NAVIGATION_MODE_MANUAL:
-				calculate_pwm(joy_input, pwm_output);
+				pwm_error = calculate_pwm(joy_input, pwm_output);
 				break;
 			case NAVIGATION_MODE_STABILIZE_FULL:
-				calculate_pwm_with_pid(joy_input, pwm_output, &imu_data.orientation, &fluid_pressure.fluid_pressure, integration_intervals);
+				pwm_error = calculate_pwm_with_pid(joy_input, pwm_output, (Quaternion *)&imu_data.orientation, (float *) &fluid_pressure.fluid_pressure, integration_intervals);
 			default:
 				set_pwm_idle();
+				for(uint8_t i = 0; i < 8; i++) thruster_status.thrusters_pwms[i] = 1500;
 				break;
 			}
 			// send pwms
+			for(uint8_t i = 0; i < 8; i++)
+			{
+				// check pwm is in range, else publish to diagnostic
+			}
 			set_pwms(pwm_output);
 		} else
 		{
 			set_pwm_idle();
+			for(uint8_t i = 0; i < 8; i++) thruster_status.thrusters_pwms[i] = 1500;
 		}
+
+    	// publish thruster state
+    	for(uint8_t i = 0; i < 8; i++) thruster_status.thrusters_pwms[i] = pwm_output[i];
+    	rc = rcl_publish(&thruster_status_publisher, &thruster_status, NULL);
+    	if(RCL_RET_OK != rc)
+    	{
+    		// TODO add to diagnostic, blink status LED?, write logs to flash?
+    	}
+    	// publish diagnostic
+
     }
   /* USER CODE END StartDefaultTask */
 }
@@ -542,5 +589,22 @@ void set_nav_mode_service_callback(const void * request_msg, void * response_msg
 			navigation_mode = NAVIGATION_MODE_MANUAL;
 			break;
 	}
+}
+
+
+uint8_t add_diagnostic_status(diagnostic_msgs__msg__DiagnosticArray * array, char * hardware_id, RosErrors level, char * name, char * message)
+{
+	static uint8_t current_diag_messages = 0;
+	if(current_diag_messages >= MAX_DIAG_MESSAGES) return 0;
+	diagnostic_msgs__msg__DiagnosticStatus status;
+	status.hardware_id.data = hardware_id;
+	status.level = level;
+	status.name.data = name;
+	status.message.data = message;
+
+	array->status.data[current_diag_messages] = status;
+	current_diag_messages++;
+	return current_diag_messages;
+
 }
 /* USER CODE END Application */
