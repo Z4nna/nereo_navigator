@@ -34,8 +34,8 @@
 #include <uxr/client/transport.h>
 #include <rmw_microxrcedds_c/config.h>
 #include <rmw_microros/rmw_microros.h>
-#include "rcutils/time.h"
-#include "rclc_parameter/rclc_parameter.h"
+#include <rcutils/time.h>
+#include <rclc_parameter/rclc_parameter.h>
 
 // messages includes
 #include <diagnostic_msgs/msg/Diagnostic_Array.h>
@@ -132,7 +132,7 @@ void set_pwms(uint16_t pwms[8]);
 
 void arm_disarm_service_callback(const void *, void *);
 void set_nav_mode_service_callback(const void *, void *);
-uint8_t add_diagnostic_status(diagnostic_msgs__msg__DiagnosticArray * array, char * hardware_id, RosErrors level, char * name, char * message);
+size_t add_diagnostic_status(diagnostic_msgs__msg__DiagnosticArray * array, char * hardware_id, RosErrors level, char * name, char * message);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -231,10 +231,15 @@ void StartDefaultTask(void *argument)
 
 	// messages
 	diagnostic_msgs__msg__DiagnosticArray diagnostic_values_array;
+
+	// does it work like this or do I have to declare a char * and then assign it to the data field, updating also size and capacity?? need to test on f303re
+	diagnostic_values_array.header.frame_id.capacity = 14;
 	diagnostic_values_array.header.frame_id.data = "navigator_fc";
-	// need to malloc :(, not sure if I should use malloc() or microros_allocate() ... will be tested soon on the hardware
-	diagnostic_values_array.status.data =
-			(diagnostic_msgs__msg__DiagnosticStatus *)microros_allocate(sizeof(diagnostic_msgs__msg__DiagnosticStatus) * MAX_DIAG_MESSAGES, NULL);
+
+	diagnostic_msgs__msg__DiagnosticStatus diagnostic_statuses[MAX_DIAG_MESSAGES];
+	diagnostic_values_array.status.data = diagnostic_statuses;
+	diagnostic_values_array.status.capacity = MAX_DIAG_MESSAGES;
+	diagnostic_values_array.status.size = 0;
 
 	nereo_interfaces__msg__ThrusterStatuses thruster_status;
 	sensor_msgs__msg__Joy joystick_input;
@@ -452,7 +457,6 @@ void StartDefaultTask(void *argument)
 	uint16_t pwm_output[8] = {1500};
 
 	uint8_t pwm_error = 0;
-	diagnostic_values_array.header.frame_id.data = "navigator_fc";
 
     while(1)
     {
@@ -591,20 +595,17 @@ void set_nav_mode_service_callback(const void * request_msg, void * response_msg
 	}
 }
 
-
-uint8_t add_diagnostic_status(diagnostic_msgs__msg__DiagnosticArray * array, char * hardware_id, RosErrors level, char * name, char * message)
+size_t add_diagnostic_status(diagnostic_msgs__msg__DiagnosticArray * array, char * hardware_id, RosErrors level, char * name, char * message)
 {
-	static uint8_t current_diag_messages = 0;
-	if(current_diag_messages >= MAX_DIAG_MESSAGES) return 0;
-	diagnostic_msgs__msg__DiagnosticStatus status;
-	status.hardware_id.data = hardware_id;
-	status.level = level;
-	status.name.data = name;
-	status.message.data = message;
+	if(array->status.size >= array->status.capacity) return 0;
 
-	array->status.data[current_diag_messages] = status;
-	current_diag_messages++;
-	return current_diag_messages;
+	array->status.data[array->status.size].hardware_id.data = hardware_id;
+	array->status.data[array->status.size].level = level;
+	array->status.data[array->status.size].name.data = name;
+	array->status.data[array->status.size].message.data = message;
+	array->status.size++;
+
+	return array->status.size;
 
 }
 /* USER CODE END Application */
