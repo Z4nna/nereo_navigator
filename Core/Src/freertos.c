@@ -467,6 +467,9 @@ void StartDefaultTask(void *argument)
 		}
     	diagnostic_values_array.header.stamp.sec = RCUTILS_NS_TO_S(now);
     	diagnostic_values_array.header.stamp.nanosec = now % (1000*1000*1000);
+
+    	for(uint8_t i = 0; i < 8; i++) thruster_status.thrusters_pwms[i] = 1500;
+
     	if (is_rov_armed == ROV_ARMED)
     	{
     		// save joystick input
@@ -481,9 +484,9 @@ void StartDefaultTask(void *argument)
 				break;
 			case NAVIGATION_MODE_STABILIZE_FULL:
 				pwm_error = calculate_pwm_with_pid(joy_input, pwm_output, (Quaternion *)&imu_data.orientation, (float *) &fluid_pressure.fluid_pressure, integration_intervals);
+				break;
 			default:
-				set_pwm_idle();
-				for(uint8_t i = 0; i < 8; i++) thruster_status.thrusters_pwms[i] = 1500;
+				for(uint8_t i = 0; i < 8; i++) pwm_output[i] = 1500;
 				break;
 			}
 			// send pwms
@@ -495,9 +498,7 @@ void StartDefaultTask(void *argument)
 		} else
 		{
 			set_pwm_idle();
-			for(uint8_t i = 0; i < 8; i++) thruster_status.thrusters_pwms[i] = 1500;
 		}
-
     	// publish thruster state
     	for(uint8_t i = 0; i < 8; i++) thruster_status.thrusters_pwms[i] = pwm_output[i];
     	rc = rcl_publish(&thruster_status_publisher, &thruster_status, NULL);
@@ -506,7 +507,7 @@ void StartDefaultTask(void *argument)
     		// TODO add to diagnostic, blink status LED?, write logs to flash?
     	}
     	// publish diagnostic
-
+    	rc = rcl_publish(&diagnostic_publisher, &diagnostic_values_array, NULL);
     }
   /* USER CODE END StartDefaultTask */
 }
@@ -558,11 +559,14 @@ void arm_disarm_service_callback(const void * request_msg, void * response_msg)
   // Handle request message and set the response message values
   is_rov_armed = req_in->data ? ROV_ARMED : ROV_DISARMED;
   res_in->success = true;
+  res_in->message.capacity = 15;
   if(is_rov_armed == ROV_ARMED)
   {
+	  res_in->message.size = 10;
 	  res_in->message.data = "ROV ARMED";
   } else
   {
+	  res_in->message.size = 13;
 	  res_in->message.data = "ROV DISARMED";
   }
 
@@ -578,17 +582,23 @@ void set_nav_mode_service_callback(const void * request_msg, void * response_msg
 			navigation_mode = NAVIGATION_MODE_MANUAL;
 			res_in->success = true;
 			res_in->mode_after_set = NAVIGATION_MODE_MANUAL;
+			res_in->message.capacity = 32;
+			res_in->message.size = 30;
 			res_in->message.data = "Navigation mode set to manual.";
 			break;
 		case NAVIGATION_MODE_STABILIZE_FULL:
 			res_in->success = true;
 			res_in->mode_after_set = NAVIGATION_MODE_STABILIZE_FULL;
+			res_in->message.capacity = 42;
+			res_in->message.size = 40;
 			res_in->message.data = "Navigation mode set to stabilize: full.";
 			navigation_mode = NAVIGATION_MODE_STABILIZE_FULL;
 			break;
 		default:
 			res_in->success = false;
 			res_in->mode_after_set = NAVIGATION_MODE_MANUAL;
+			res_in->message.capacity = 77;
+			res_in->message.size = 75;
 			res_in->message.data = "Wrong request: navigation mode does not exist. Reverted back to manual mode.";
 			navigation_mode = NAVIGATION_MODE_MANUAL;
 			break;
@@ -599,10 +609,20 @@ size_t add_diagnostic_status(diagnostic_msgs__msg__DiagnosticArray * array, char
 {
 	if(array->status.size >= array->status.capacity) return 0;
 
+	array->status.data[array->status.size].hardware_id.capacity = strlen(hardware_id) + 5;
+	array->status.data[array->status.size].hardware_id.size = strlen(hardware_id);
 	array->status.data[array->status.size].hardware_id.data = hardware_id;
+
 	array->status.data[array->status.size].level = level;
+
+	array->status.data[array->status.size].name.capacity = strlen(name) + 5;
+	array->status.data[array->status.size].name.size = strlen(name);
 	array->status.data[array->status.size].name.data = name;
+
+	array->status.data[array->status.size].message.capacity = strlen(message) + 5;
+	array->status.data[array->status.size].message.size = strlen(message);
 	array->status.data[array->status.size].message.data = message;
+
 	array->status.size++;
 
 	return array->status.size;
