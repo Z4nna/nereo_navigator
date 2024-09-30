@@ -4,8 +4,6 @@
  *  Created on: May 28, 2024
  *      Author: michelecarenini
  */
-
-
 #include "stabilize_mode.h"
 
 // tolerance: if a joystick input (in [-1,1]) is < TOLERANCE, it is considered as 0
@@ -136,7 +134,8 @@ uint8_t calculate_pwm_with_pid(const float joystick_input[6], uint16_t pwm_outpu
 	if (fabsf(yaw_pid_feedback) < TOLERANCE || fabsf(input_values[5] < TOLERANCE))
 	{
 		input_values[5] += yaw_pid_feedback;
-		return 1;
 	}
-	return 0;
+
+	uint8_t code = calculate_pwm(&input_values, pwm_output);
+	return code;
 }
